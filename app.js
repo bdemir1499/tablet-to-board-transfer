@@ -3718,6 +3718,34 @@ canvas.addEventListener('pointerup', (e) => {
             });
 
             if (selectedMeshes.length >= 1) {
+                // 🚨 OTOMATİK DERİNLİK (Z) EŞİTLEME: En büyük cismi bul ve tüm seçilenlerin Z derinliğini ona kilitle!
+                if (selectedMeshes.length > 1) {
+                    let largestMesh = selectedMeshes[0];
+                    let maxRadius = 0;
+                    selectedMeshes.forEach(m => {
+                        let r = 1;
+                        if (m.geometry) {
+                            if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+                            r = (m.geometry.boundingSphere ? m.geometry.boundingSphere.radius : 1) * Math.max(m.scale.x, m.scale.y, m.scale.z);
+                        } else {
+                            r = Math.max(m.scale.x, m.scale.y, m.scale.z);
+                        }
+                        if (r > maxRadius) {
+                            maxRadius = r;
+                            largestMesh = m;
+                        }
+                    });
+
+                    const targetZ = largestMesh.position.z;
+                    selectedMeshes.forEach(m => {
+                        m.position.z = targetZ;
+                        if (m.userData && m.userData.strokeData) {
+                            m.userData.strokeData.pos3D = { x: m.position.x, y: m.position.y, z: m.position.z };
+                            if (typeof window.sendNetworkData === 'function') window.sendNetworkData({ type: 'sekil_guncelle', stroke: m.userData.strokeData });
+                        }
+                    });
+                }
+
                 const avgPos = new THREE.Vector3();
                 selectedMeshes.forEach(m => {
                     const wp = new THREE.Vector3();
