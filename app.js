@@ -5651,8 +5651,31 @@ if (isTablet) {
         if (pinSaha) pinSaha.innerText = window.sessionPassword;
         const panel = document.getElementById('network-panel');
         const miniBtn = document.getElementById('network-mini-btn');
-        if (panel) panel.style.display = 'block';
+        if (panel) {
+            panel.style.display = 'block';
+            panel.style.opacity = '1';
+            panel.style.visibility = 'visible';
+            panel.style.zIndex = '40000';
+        }
         if (miniBtn) miniBtn.style.display = 'none';
+
+        // 🚨 PANEL KORUMA GÖZCÜSÜ (GUARD): Tahta modunda bağlantı kurulana kadar panel asla gizlenemez
+        if (!window.panelGozcusuBaslatildi) {
+            window.panelGozcusuBaslatildi = true;
+            setInterval(() => {
+                if (typeof isConnected === 'undefined' || !isConnected) {
+                    const p = document.getElementById('network-panel');
+                    const m = document.getElementById('network-mini-btn');
+                    if (p && (p.style.display === 'none' || p.classList.contains('hidden') || p.style.opacity === '0')) {
+                        p.style.display = 'block';
+                        p.style.opacity = '1';
+                        p.style.visibility = 'visible';
+                        p.style.zIndex = '40000';
+                        if (m) m.style.display = 'none';
+                    }
+                }
+            }, 300);
+        }
     });
 }
 // --- 3. BAĞLANTI İSTEK DİNLEYİCİSİ (KAPI ZİLİ) ---
@@ -5767,8 +5790,30 @@ myPeer.on('open', function (id) {
         if (pinSaha) pinSaha.innerText = window.sessionPassword;
         const panel = document.getElementById('network-panel');
         const miniBtn = document.getElementById('network-mini-btn');
-        if (panel) panel.style.display = 'block';
+        if (panel) {
+            panel.style.display = 'block';
+            panel.style.opacity = '1';
+            panel.style.visibility = 'visible';
+            panel.style.zIndex = '40000';
+        }
         if (miniBtn) miniBtn.style.display = 'none';
+
+        if (!window.panelGozcusuBaslatildi) {
+            window.panelGozcusuBaslatildi = true;
+            setInterval(() => {
+                if (typeof isConnected === 'undefined' || !isConnected) {
+                    const p = document.getElementById('network-panel');
+                    const m = document.getElementById('network-mini-btn');
+                    if (p && (p.style.display === 'none' || p.classList.contains('hidden') || p.style.opacity === '0')) {
+                        p.style.display = 'block';
+                        p.style.opacity = '1';
+                        p.style.visibility = 'visible';
+                        p.style.zIndex = '40000';
+                        if (m) m.style.display = 'none';
+                    }
+                }
+            }, 300);
+        }
     } else {
         const panel = document.getElementById('network-panel');
         if (panel) {
