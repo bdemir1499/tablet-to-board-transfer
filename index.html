@@ -8,7 +8,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="style.css?v=420">
+    <link rel="stylesheet" href="style.css?v=430">
     <link rel="stylesheet" href="ruler.css">
     <link rel="stylesheet" href="gonye.css">
     <link rel="stylesheet" href="aciolcer.css">
@@ -20,7 +20,7 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=clean_cache_420')
+                navigator.serviceWorker.register('sw.js?v=clean_cache_430')
                     .then(reg => console.log('Uygulama Hazır'))
                     .catch(err => console.log('Hata:', err));
             });
@@ -62,10 +62,9 @@
     // =========================================================
     
     // Global Panel Küçültme Fonksiyonu
-    window.kucultPanel = function() {
-        const isTabletMode = window.location.search.includes("tablet") || window.location.hash.includes("tablet") || window.location.href.includes("mode=tablet") || window.location.href.includes("?tablet");
-        if (!isTabletMode && !window.kullaniciKendiKapatti) {
-            console.log("Tahta modunda otomatik kucultPanel engellendi.");
+    window.kucultPanel = function(zorla) {
+        if (!zorla && (typeof isConnected === 'undefined' || !isConnected) && !window.kullaniciKendiKapatti) {
+            console.log("Bağlantı öncesi tahtada otomatik kucultPanel engellendi.");
             return;
         }
         const pnl = document.getElementById('network-panel');
@@ -305,7 +304,7 @@
     <script src="gonye.js?v=377"></script>
     <script src="aciolcer.js?v=377"></script>
     <script src="pergel.js?v=377"></script>
-    <script src="app.js?v=420" defer></script>
+    <script src="app.js?v=430" defer></script>
     <script src="cokgen.js?v=377" defer></script>
     <script src="oyunlar.js?v=377"></script>
     <script src="shape3d_fold.js?v=377"></script>

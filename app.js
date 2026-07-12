@@ -1471,9 +1471,12 @@ function redrawAllStrokes() {
 
             // 1. ÜÇ BOYUTLU NESNEYİ 2D EKRAN MERKEZİNE VE BOYUTUNA ZORLA UYDUR (SENKRONİZASYON)
             if (window.Scene3D && window.Scene3D.scene) {
-                const sceneMesh = window.Scene3D.scene.children.find(m => m.userData && m.userData.strokeData && m.userData.strokeData.id === stroke.id);
+                const sceneMesh = window.Scene3D.findMeshById ? window.Scene3D.findMeshById(stroke.id) : window.Scene3D.scene.children.find(m => m.userData && m.userData.strokeData && m.userData.strokeData.id === stroke.id);
                 if (sceneMesh) {
-                    if (stroke.rotationX !== undefined) sceneMesh.rotation.x = stroke.rotationX;
+                    if (sceneMesh.parent && sceneMesh.parent.type === 'Group' && sceneMesh.parent !== window.Scene3D.scene) {
+                        // Eğer nesne 3D grup içerisindeyse (Tümünü Seç yapıldıysa), grubun kendi koordinat/döndürme sistemini koru
+                    } else {
+                        if (stroke.rotationX !== undefined) sceneMesh.rotation.x = stroke.rotationX;
                     if (stroke.rotationY !== undefined) sceneMesh.rotation.y = stroke.rotationY;
                     if (stroke.rotationZ !== undefined) sceneMesh.rotation.z = stroke.rotationZ;
                     
@@ -1500,13 +1503,14 @@ function redrawAllStrokes() {
                         const intersection = new THREE.Vector3();
                         
                         if (raycaster.ray.intersectPlane(plane, intersection)) {
-                            sceneMesh.position.copy(intersection);
+                            if (stroke.pos3D && stroke.pos3D.x !== undefined && stroke.pos3D.y !== undefined && stroke.pos3D.z !== undefined) {
+                                sceneMesh.position.set(stroke.pos3D.x, stroke.pos3D.y, stroke.pos3D.z);
+                            } else {
+                                sceneMesh.position.copy(intersection);
+                                if (stroke.pos3D && stroke.pos3D.z !== undefined) sceneMesh.position.z = stroke.pos3D.z;
+                            }
                         }
 
-                        if (stroke.pos3D && stroke.pos3D.z !== undefined) {
-                            sceneMesh.position.z = stroke.pos3D.z;
-                        }
-                        
                         // 🚨 KUSURSUZ BOYUT + AĞ ÖLÇEĞİ: Koordinatları bozmadan sadece pembe buton çarpanını ekliyoruz
                         const threeJSHeightRatio = 30 / myCh;
                         const targetThreeJSWidth = refW * threeJSHeightRatio;
@@ -1517,6 +1521,7 @@ function redrawAllStrokes() {
                         sceneMesh.scale.setScalar(gercekOlcek * mScale);
                     }
                 }
+            }
             }
 
             // 2. SEÇİLİYKEN YEŞİL VE PEMBE KULPLARI ÇİZ (ESKİ ÖZELLİĞİN GERİ GELMESİ)
@@ -3063,6 +3068,7 @@ canvas.addEventListener('touchmove', (e) => {
     }
 }, { passive: false });
 canvas.addEventListener('pointerdown', (e) => {
+    if (typeof window.kucultPanel === 'function') window.kucultPanel(true);
     // 🚨 SİHİRLİ DOKUNUŞ 1: Ne olursa olsun ÖNCE tarayıcının yerleşik kaydırmasını (titremeyi) kilitliyoruz!
     if (e.cancelable) e.preventDefault();
 
@@ -3769,6 +3775,15 @@ canvas.addEventListener('pointerup', (e) => {
 
                 window.Scene3D.currentGroupMesh = groupMesh;
                 window.Scene3D.currentMesh = groupMesh;
+
+                if (typeof window.sendNetworkData === 'function') {
+                    window.sendNetworkData({
+                        type: '3d_grup_olustur',
+                        ids: selectedMeshes.map(m => m.userData && m.userData.strokeData ? m.userData.strokeData.id : null).filter(Boolean),
+                        groupId: groupMesh.userData.strokeData.id,
+                        pos3D: { x: avgPos.x, y: avgPos.y, z: avgPos.z }
+                    });
+                }
             }
         }
 
@@ -5497,9 +5512,10 @@ function akilliSilgi(e, isDown) {
 
                 // 🚨 Eğer 3D şekilse, 3D uzay sahnesinden (Scene3D) kazı!
                 if (s.type === '3d_shape' && window.Scene3D && window.Scene3D.scene) {
-                    const meshToRemove = window.Scene3D.scene.children.find(m => m.userData && m.userData.strokeData && m.userData.strokeData.id === s.id);
+                    const meshToRemove = window.Scene3D.findMeshById ? window.Scene3D.findMeshById(s.id) : window.Scene3D.scene.children.find(m => m.userData && m.userData.strokeData && m.userData.strokeData.id === s.id);
                     if (meshToRemove) {
-                        window.Scene3D.scene.remove(meshToRemove);
+                        if (meshToRemove.parent && meshToRemove.parent !== window.Scene3D.scene) meshToRemove.parent.remove(meshToRemove);
+                        else window.Scene3D.scene.remove(meshToRemove);
                         if (window.Scene3D.currentMesh === meshToRemove) window.Scene3D.currentMesh = null;
                         window.Scene3D.updateHandlePositions();
                     }
@@ -5744,7 +5760,7 @@ myPeer.on('connection', function (conn) {
                     }
 
                     if (typeof window.kucultPanel === 'function') {
-                        window.kucultPanel();
+                        window.kucultPanel(true);
                     }
 
                     setupConnectionEvents();
@@ -5861,7 +5877,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // 🚨 YENİ: Bağlantı kurulunca oda/şifre panelini otomatik küçült 🚨
                     if (typeof window.kucultPanel === 'function') {
-                        window.kucultPanel();
+                        window.kucultPanel(true);
                     }
 
                     setupConnectionEvents();
@@ -6521,6 +6537,50 @@ if (!data || !data.type) return;
         // --- BURAYA EKLENECEK TEK SATIR ---
         window.isConnected = true;
 
+        if (data.type === '3d_grup_olustur' && window.Scene3D && window.Scene3D.scene) {
+            window.Scene3D.clearGroupSelection();
+            const selectedMeshes = [];
+            if (data.ids && Array.isArray(data.ids)) {
+                data.ids.forEach(id => {
+                    const m = window.Scene3D.findMeshById ? window.Scene3D.findMeshById(id) : null;
+                    if (m) selectedMeshes.push(m);
+                });
+            }
+            if (selectedMeshes.length >= 1) {
+                const avgPos = data.pos3D ? new THREE.Vector3(data.pos3D.x, data.pos3D.y, data.pos3D.z) : new THREE.Vector3();
+                const groupMesh = new THREE.Group();
+                groupMesh.position.copy(avgPos);
+                window.Scene3D.scene.add(groupMesh);
+                selectedMeshes.forEach(m => groupMesh.attach(m));
+                groupMesh.userData = {
+                    isMultiGroup: true,
+                    strokeData: { id: data.groupId || ('group_' + Date.now()), type: '3d_group', pos3D: { x: avgPos.x, y: avgPos.y, z: avgPos.z } }
+                };
+                window.Scene3D.currentGroupMesh = groupMesh;
+                window.Scene3D.currentMesh = groupMesh;
+                window.Scene3D.updateHandlePositions();
+                if (typeof window.redrawAllStrokes === 'function') window.redrawAllStrokes();
+            }
+            return;
+        }
+
+        if (data.type === '3d_grup_tasi' && window.Scene3D && window.Scene3D.currentGroupMesh) {
+            const g = window.Scene3D.currentGroupMesh;
+            if (data.pos3D) g.position.set(data.pos3D.x, data.pos3D.y, data.pos3D.z);
+            if (data.rotation) g.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+            if (data.scale !== undefined) g.scale.setScalar(data.scale);
+            window.Scene3D.updateHandlePositions();
+            if (typeof window.redrawAllStrokes === 'function') window.redrawAllStrokes();
+            return;
+        }
+
+        if (data.type === '3d_grup_ayir' && window.Scene3D) {
+            window.Scene3D._isNetworkUngrouping = true;
+            window.Scene3D.ungroupCurrentSelection();
+            window.Scene3D._isNetworkUngrouping = false;
+            return;
+        }
+
         if (data.type === 'sekil_guncelle') {
             const stroke = data.stroke;
             if (!stroke) return;
@@ -6590,20 +6650,23 @@ if (!data || !data.type) return;
 
                 // 🚨 PC MOTORU: TABLETTEN GELEN SÜRÜKLEME VE DÖNDÜRME BİLGİSİNİ SAHNEYE UYGULA
                 if (hedef.type === '3d_shape' && window.Scene3D && window.Scene3D.scene) {
-                    const sceneMesh = window.Scene3D.scene.children.find(m => m.userData && m.userData.strokeData && m.userData.strokeData.id === hedef.id);
+                    const sceneMesh = window.Scene3D.findMeshById ? window.Scene3D.findMeshById(hedef.id) : window.Scene3D.scene.children.find(m => m.userData && m.userData.strokeData && m.userData.strokeData.id === hedef.id);
                     if (sceneMesh) {
-                        
-                        // 🚨 NİHAİ ÇÖZÜM 2: Konum ve boyutlandırmayı burada YAPMIYORUZ! 
-                // Zıplamaların ana sebebi buydu. Çizim motoru (redrawAllStrokes) zaten onu 
-                // PC'de olması gereken milimetrik konuma taşıyor. Sadece Z eksenini koruyup bırakıyoruz.
-                if (data.stroke.pos3D && data.stroke.pos3D.z !== undefined) {
-                    sceneMesh.position.z = data.stroke.pos3D.z;
-                }
-
-                        // Rotasyon ayarlarını koru
-                        if (data.stroke.rotationX !== undefined) sceneMesh.rotation.x = data.stroke.rotationX;
-                        if (data.stroke.rotationY !== undefined) sceneMesh.rotation.y = data.stroke.rotationY;
-                        if (data.stroke.rotationZ !== undefined) sceneMesh.rotation.z = data.stroke.rotationZ;
+                        if (sceneMesh.parent && sceneMesh.parent.type === 'Group' && sceneMesh.parent !== window.Scene3D.scene) {
+                            // Grup hareketi zaten 3d_grup_tasi ile üstten senkronize ediliyor
+                        } else {
+                            if (data.stroke.pos3D && data.stroke.pos3D.x !== undefined && data.stroke.pos3D.y !== undefined && data.stroke.pos3D.z !== undefined) {
+                                sceneMesh.position.set(data.stroke.pos3D.x, data.stroke.pos3D.y, data.stroke.pos3D.z);
+                                if (!hedef.pos3D) hedef.pos3D = { ...data.stroke.pos3D };
+                                else { hedef.pos3D.x = data.stroke.pos3D.x; hedef.pos3D.y = data.stroke.pos3D.y; hedef.pos3D.z = data.stroke.pos3D.z; }
+                            } else if (data.stroke.pos3D && data.stroke.pos3D.z !== undefined) {
+                                sceneMesh.position.z = data.stroke.pos3D.z;
+                            }
+                            // Rotasyon ayarlarını koru
+                            if (data.stroke.rotationX !== undefined) sceneMesh.rotation.x = data.stroke.rotationX;
+                            if (data.stroke.rotationY !== undefined) sceneMesh.rotation.y = data.stroke.rotationY;
+                            if (data.stroke.rotationZ !== undefined) sceneMesh.rotation.z = data.stroke.rotationZ;
+                        }
 
                         // Sürgü açınım bilgisini senkronize et
                         if (data.stroke.openRatio !== undefined) {
@@ -7282,6 +7345,9 @@ window.Scene3D = {
 
     ungroupCurrentSelection: function () {
         if (this.currentMesh && this.currentMesh.userData && this.currentMesh.userData.isMultiGroup) {
+            if (typeof window.sendNetworkData === 'function' && !this._isNetworkUngrouping) {
+                window.sendNetworkData({ type: '3d_grup_ayir' });
+            }
             const group = this.currentMesh;
             while (group.children.length > 0) {
                 const child = group.children[0];
@@ -7432,6 +7498,17 @@ window.Scene3D = {
         this.animate();
     },
 
+    findMeshById: function(id) {
+        if (!this.scene) return null;
+        let found = null;
+        this.scene.traverse(child => {
+            if (!found && child.userData && child.userData.strokeData && child.userData.strokeData.id === id) {
+                found = child;
+            }
+        });
+        return found;
+    },
+
     updateHandlePositions: function () {
         if (!this.currentMesh || currentTool !== 'move') {
             if (this.rotateHandleBtn) this.rotateHandleBtn.style.display = 'none';
@@ -7528,6 +7605,7 @@ window.Scene3D = {
     },
 
     onDown: function (x, y) {
+        if (typeof window.kucultPanel === 'function') window.kucultPanel(true);
         if (!this.isInit) return false;
         if (this.container) { this.container.style.display = 'block'; this.container.classList.remove('hidden'); }
         if (this.isRotatingHandle || this.isResizingHandle) return true;
@@ -7615,8 +7693,16 @@ window.Scene3D = {
             this.lastMousePos = { x, y };
             this.updateHandlePositions();
             
-            // Yeşil buton verisi PC'ye sorunsuz iletilir (Grup veya tekil)
             if (this.currentMesh.userData && this.currentMesh.userData.isMultiGroup) {
+                if (typeof window.sendNetworkData === 'function') {
+                    window.sendNetworkData({
+                        type: '3d_grup_tasi',
+                        groupId: this.currentMesh.userData.strokeData ? this.currentMesh.userData.strokeData.id : null,
+                        pos3D: { x: this.currentMesh.position.x, y: this.currentMesh.position.y, z: this.currentMesh.position.z },
+                        rotation: { x: this.currentMesh.rotation.x, y: this.currentMesh.rotation.y, z: this.currentMesh.rotation.z },
+                        scale: this.currentMesh.scale.x
+                    });
+                }
                 this.currentMesh.children.forEach(child => {
                     if (child.userData && child.userData.strokeData) {
                         const sd = child.userData.strokeData;
@@ -7648,6 +7734,15 @@ window.Scene3D = {
             if (this.currentMesh.userData && this.currentMesh.userData.isMultiGroup) {
                 this.currentMesh.scale.multiplyScalar(dragRatio);
                 this.startResizeDist = currentDist;
+                if (typeof window.sendNetworkData === 'function') {
+                    window.sendNetworkData({
+                        type: '3d_grup_tasi',
+                        groupId: this.currentMesh.userData.strokeData ? this.currentMesh.userData.strokeData.id : null,
+                        pos3D: { x: this.currentMesh.position.x, y: this.currentMesh.position.y, z: this.currentMesh.position.z },
+                        rotation: { x: this.currentMesh.rotation.x, y: this.currentMesh.rotation.y, z: this.currentMesh.rotation.z },
+                        scale: this.currentMesh.scale.x
+                    });
+                }
                 this.currentMesh.children.forEach(child => {
                     if (child.userData && child.userData.strokeData) {
                         const sd = child.userData.strokeData;
@@ -7681,6 +7776,15 @@ window.Scene3D = {
                 this.updateHandlePositions();
                 
                 if (this.currentMesh.userData && this.currentMesh.userData.isMultiGroup) {
+                    if (typeof window.sendNetworkData === 'function') {
+                        window.sendNetworkData({
+                            type: '3d_grup_tasi',
+                            groupId: this.currentMesh.userData.strokeData ? this.currentMesh.userData.strokeData.id : null,
+                            pos3D: { x: this.currentMesh.position.x, y: this.currentMesh.position.y, z: this.currentMesh.position.z },
+                            rotation: { x: this.currentMesh.rotation.x, y: this.currentMesh.rotation.y, z: this.currentMesh.rotation.z },
+                            scale: this.currentMesh.scale.x
+                        });
+                    }
                     this.currentMesh.children.forEach(child => {
                         if (child.userData && child.userData.strokeData) {
                             const sd = child.userData.strokeData;
