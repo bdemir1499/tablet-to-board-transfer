@@ -3705,8 +3705,8 @@ canvas.addEventListener('pointerup', (e) => {
             const selectedMeshes = [];
             const camera = window.Scene3D.camera;
             const canvasEl = document.getElementById('drawing-canvas');
-            const rect = canvasEl ? canvasEl.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight };
-            const w = rect.width / 2, h = rect.height / 2;
+            const w = (canvasEl ? canvasEl.width : window.innerWidth) / 2;
+            const h = (canvasEl ? canvasEl.height : window.innerHeight) / 2;
 
             window.Scene3D.scene.children.forEach(child => {
                 if (child === window.Scene3D.helperGroup || (child.type !== 'Mesh' && child.type !== 'Group')) return;
@@ -3718,7 +3718,11 @@ canvas.addEventListener('pointerup', (e) => {
                 const screenX = (vec.x * w) + w;
                 const screenY = -(vec.y * h) + h;
 
-                if (screenX >= xMin && screenX <= xMax && screenY >= yMin && screenY <= yMax) {
+                const sd = child.userData.strokeData;
+                const isOverlapping = (screenX >= xMin && screenX <= xMax && screenY >= yMin && screenY <= yMax) ||
+                                      (sd.x !== undefined && sd.width !== undefined && sd.x <= xMax && (sd.x + sd.width) >= xMin && sd.y <= yMax && (sd.y + sd.height) >= yMin);
+
+                if (isOverlapping) {
                     selectedMeshes.push(child);
                 }
             });
@@ -7951,22 +7955,26 @@ window.Scene3D = {
             solidShape.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), edgeMaterial));
         }
 
-        // 🚨 ÇÖZÜM 1: 3D Şeklin yaratılışında PC ekranına mükemmel hizalanması
-        const canvasElm = document.getElementById('drawing-canvas');
-        const myCw = canvasElm ? canvasElm.width : window.innerWidth;
-        const myCh = canvasElm ? canvasElm.height : window.innerHeight;
-        
-        const cx = strokeData.x + (strokeData.width / 2);
-        const cy = strokeData.y + (strokeData.height / 2);
-        
-        const ndcX = (cx / myCw) * 2 - 1;
-        const ndcY = -(cy / myCh) * 2 + 1;
-        
-        const vec = new THREE.Vector3(ndcX, ndcY, 0);
-        vec.unproject(this.camera);
-        solidShape.position.x = vec.x;
-        solidShape.position.y = vec.y;
-        solidShape.position.z = (strokeData.pos3D && strokeData.pos3D.z !== undefined) ? strokeData.pos3D.z : 0;
+        // 🚨 ÇÖZÜM 1: 3D Şeklin yaratılışında PC ekranına ve ağ koordinatlarına mükemmel hizalanması
+        if (strokeData.pos3D && strokeData.pos3D.x !== undefined && strokeData.pos3D.y !== undefined && strokeData.pos3D.z !== undefined) {
+            solidShape.position.set(strokeData.pos3D.x, strokeData.pos3D.y, strokeData.pos3D.z);
+        } else {
+            const canvasElm = document.getElementById('drawing-canvas');
+            const myCw = canvasElm ? canvasElm.width : window.innerWidth;
+            const myCh = canvasElm ? canvasElm.height : window.innerHeight;
+            
+            const cx = strokeData.x + (strokeData.width / 2);
+            const cy = strokeData.y + (strokeData.height / 2);
+            
+            const ndcX = (cx / myCw) * 2 - 1;
+            const ndcY = -(cy / myCh) * 2 + 1;
+            
+            const vec = new THREE.Vector3(ndcX, ndcY, 0);
+            vec.unproject(this.camera);
+            solidShape.position.x = vec.x;
+            solidShape.position.y = vec.y;
+            solidShape.position.z = (strokeData.pos3D && strokeData.pos3D.z !== undefined) ? strokeData.pos3D.z : 0;
+        }
 
         // 🚨 NİHAİ ÇÖZÜM 1: İlk yaratılışta ölçeği 1'de sabit bırakıyoruz. 
         // Gerçek büyüklük redrawAllStrokes içinde hesaplanacak.
