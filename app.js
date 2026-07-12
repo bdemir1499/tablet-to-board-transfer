@@ -5659,11 +5659,11 @@ if (isTablet) {
         }
         if (miniBtn) miniBtn.style.display = 'none';
 
-        // 🚨 PANEL KORUMA GÖZCÜSÜ (GUARD): Tahta modunda bağlantı kurulana kadar panel asla gizlenemez
+        // 🚨 PANEL KORUMA GÖZCÜSÜ (GUARD): Tahta modunda kullanıcı X tuşuna basmadığı sürece panel asla gizlenemez
         if (!window.panelGozcusuBaslatildi) {
             window.panelGozcusuBaslatildi = true;
             setInterval(() => {
-                if (typeof isConnected === 'undefined' || !isConnected) {
+                if (!window.kullaniciKendiKapatti) {
                     const p = document.getElementById('network-panel');
                     const m = document.getElementById('network-mini-btn');
                     if (p && (p.style.display === 'none' || p.classList.contains('hidden') || p.style.opacity === '0')) {
@@ -5801,7 +5801,7 @@ myPeer.on('open', function (id) {
         if (!window.panelGozcusuBaslatildi) {
             window.panelGozcusuBaslatildi = true;
             setInterval(() => {
-                if (typeof isConnected === 'undefined' || !isConnected) {
+                if (!window.kullaniciKendiKapatti) {
                     const p = document.getElementById('network-panel');
                     const m = document.getElementById('network-mini-btn');
                     if (p && (p.style.display === 'none' || p.classList.contains('hidden') || p.style.opacity === '0')) {

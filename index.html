@@ -8,7 +8,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="style.css?v=399">
+    <link rel="stylesheet" href="style.css?v=410">
     <link rel="stylesheet" href="ruler.css">
     <link rel="stylesheet" href="gonye.css">
     <link rel="stylesheet" href="aciolcer.css">
@@ -20,7 +20,7 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=clean_cache_399')
+                navigator.serviceWorker.register('sw.js?v=clean_cache_410')
                     .then(reg => console.log('Uygulama Hazır'))
                     .catch(err => console.log('Hata:', err));
             });
@@ -63,6 +63,11 @@
     
     // Global Panel Küçültme Fonksiyonu
     window.kucultPanel = function() {
+        const isTabletMode = window.location.href.includes("tablet");
+        if (!isTabletMode && !window.kullaniciKendiKapatti) {
+            console.log("Tahta modunda otomatik kucultPanel engellendi.");
+            return;
+        }
         const pnl = document.getElementById('network-panel');
         const mBtn = document.getElementById('network-mini-btn');
         if(pnl) pnl.style.display = 'none';
@@ -76,6 +81,8 @@
         const pnl = document.getElementById('network-panel');
 
         function kucult() {
+            const isTabletMode = window.location.href.includes("tablet");
+            if (!isTabletMode && !window.kullaniciKendiKapatti) return;
             if (pnl && mBtn) {
                 pnl.style.display = 'none';
                 mBtn.style.display = 'block';
@@ -83,6 +90,7 @@
         }
 
         function ac() {
+            window.kullaniciKendiKapatti = false;
             if (pnl && mBtn) {
                 mBtn.style.display = 'none';
                 pnl.style.display = 'block';
@@ -90,7 +98,7 @@
         }
 
         if (cBtn && mBtn && pnl) {
-            cBtn.onclick = kucult;
+            cBtn.onclick = () => { window.kullaniciKendiKapatti = true; kucult(); };
             mBtn.onclick = ac;
         }
 
@@ -297,7 +305,7 @@
     <script src="gonye.js?v=377"></script>
     <script src="aciolcer.js?v=377"></script>
     <script src="pergel.js?v=377"></script>
-    <script src="app.js?v=399" defer></script>
+    <script src="app.js?v=410" defer></script>
     <script src="cokgen.js?v=377" defer></script>
     <script src="oyunlar.js?v=377"></script>
     <script src="shape3d_fold.js?v=377"></script>
