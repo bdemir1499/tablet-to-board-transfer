@@ -5649,6 +5649,10 @@ if (isTablet) {
         const pinSaha = document.getElementById('my-pin-code');
         if (idSaha) idSaha.innerText = id;
         if (pinSaha) pinSaha.innerText = window.sessionPassword;
+        const panel = document.getElementById('network-panel');
+        const miniBtn = document.getElementById('network-mini-btn');
+        if (panel) panel.style.display = 'block';
+        if (miniBtn) miniBtn.style.display = 'none';
     });
 }
 // --- 3. BAĞLANTI İSTEK DİNLEYİCİSİ (KAPI ZİLİ) ---
@@ -5761,6 +5765,10 @@ myPeer.on('open', function (id) {
     if (!isTablet) {
         if (idSaha) idSaha.innerText = id;
         if (pinSaha) pinSaha.innerText = window.sessionPassword;
+        const panel = document.getElementById('network-panel');
+        const miniBtn = document.getElementById('network-mini-btn');
+        if (panel) panel.style.display = 'block';
+        if (miniBtn) miniBtn.style.display = 'none';
     } else {
         const panel = document.getElementById('network-panel');
         if (panel) {
@@ -6317,13 +6325,11 @@ if (!data || !data.type) return;
             // PC için tam ekran temizliği (Görünmez CSS Balyozu!)
             const pcZirhi = document.createElement('style');
             pcZirhi.innerHTML = `
-                /* PC ekranını kilitleyen ne kadar pencere/panel varsa KÖKÜNDEN yok eder */
+                /* PC ekranını kilitleyen açılış/yükleme pencerelerini yok eder */
                 #language-overlay, .language-overlay,
                 #disclaimer-modal, .disclaimer-modal,
                 #footer-container, .footer-container,
                 #install-popup, .install-popup,
-                #network-panel, .network-panel,
-                #connect-panel, .connect-panel,
                 .start-screen, #start-screen,
                 .intro-container, #intro-container,
                 .modal, .overlay, #conn-request-modal {
@@ -6347,16 +6353,11 @@ if (!data || !data.type) return;
             `;
             document.head.appendChild(pcZirhi);
 
-            // HTML içinden de JavaScript ile gizleyelim (Çifte Güvenlik)
-            ['language-overlay', 'disclaimer-modal', 'footer-container', 'network-panel', 'connect-panel', 'start-screen'].forEach(id => {
+            // HTML içinden de JavaScript ile gizleyelim (Sadece açılış pencereleri)
+            ['language-overlay', 'disclaimer-modal', 'footer-container', 'start-screen'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.style.display = 'none';
             });
-
-            // PC ağ panelini küçülten/yok eden yerel fonksiyonu tetikle (Eğer HTML'de varsa)
-            if (typeof window.kucultPanel === 'function') {
-                window.kucultPanel();
-            }
 
             // Ekran kilitleri açıldıktan hemen sonra canvas'ı temiz bir şekilde yenile
             setTimeout(() => {
