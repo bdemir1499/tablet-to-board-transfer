@@ -5623,7 +5623,7 @@ let myRoomCode = '';
 for (let i = 0; i < 5; i++) {
     myRoomCode += chars.charAt(Math.floor(Math.random() * chars.length));
 }
-const isTablet = window.location.href.includes("tablet");
+const isTablet = window.location.search.includes("tablet") || window.location.hash.includes("tablet") || window.location.href.includes("mode=tablet") || window.location.href.includes("device=tablet") || window.location.href.includes("?tablet");
 
 // --- 2. PEERJS BAŞLANGIÇ VE CİHAZ MODU AYARI ---
 // --- 2. PEERJS BAŞLANGIÇ (ASKERİ DÜZEY YEREL AĞ KİLİDİ) ---
