@@ -5679,7 +5679,7 @@ if (isTablet) {
         if (!window.panelGozcusuBaslatildi) {
             window.panelGozcusuBaslatildi = true;
             setInterval(() => {
-                if (!window.kullaniciKendiKapatti) {
+                if ((typeof isConnected === 'undefined' || !isConnected) && !window.kullaniciKendiKapatti) {
                     const p = document.getElementById('network-panel');
                     const m = document.getElementById('network-mini-btn');
                     if (p && (p.style.display === 'none' || p.classList.contains('hidden') || p.style.opacity === '0')) {
@@ -5817,7 +5817,7 @@ myPeer.on('open', function (id) {
         if (!window.panelGozcusuBaslatildi) {
             window.panelGozcusuBaslatildi = true;
             setInterval(() => {
-                if (!window.kullaniciKendiKapatti) {
+                if ((typeof isConnected === 'undefined' || !isConnected) && !window.kullaniciKendiKapatti) {
                     const p = document.getElementById('network-panel');
                     const m = document.getElementById('network-mini-btn');
                     if (p && (p.style.display === 'none' || p.classList.contains('hidden') || p.style.opacity === '0')) {
@@ -7614,30 +7614,29 @@ window.Scene3D = {
         const intersects = this.raycaster.intersectObjects(this.scene.children, true);
         let foundMesh = intersects.find(h => h.object.type === 'Mesh' && h.object !== this.helperGroup);
 
-        // 🚨 EĞER BU BİR GRUPSA (Foldable3D) EN ÜST GRUBU BUL
-        if (foundMesh) {
-            let rootObj = foundMesh.object;
-            while (rootObj.parent && rootObj.parent !== this.scene && rootObj.parent.type === 'Group') {
-                rootObj = rootObj.parent;
-            }
-            foundMesh = { object: rootObj };
-        }
-
         // 🚨 TABLET DOKUNMATİK ZIRHI: Parmakla basıldığında 3D Işın ıskalasa bile 2D Kutusundan Kesin Yakala!
         if (!foundMesh && window.drawnStrokes && currentTool === 'move') {
             const canvasEl = document.getElementById('drawing-canvas');
             if (canvasEl) {
                 const rect = canvasEl.getBoundingClientRect();
-                // DÜZELTME: Yüksek DPI (Retina) cihazlarda canvasX hatalı olur, CSS koordinatları (cssX, cssY) kullanılmalı!
                 const cssX = x - rect.left;
                 const cssY = y - rect.top;
 
                 const hitStroke = window.drawnStrokes.find(s => s.type === '3d_shape' && Math.abs(cssX - (s.x + s.width / 2)) < Math.max(40, s.width / 2) && Math.abs(cssY - (s.y + s.height / 2)) < Math.max(40, s.height / 2));
                 if (hitStroke) {
-                    const sceneMesh = this.scene.children.find(m => m.userData && m.userData.strokeData && m.userData.strokeData.id === hitStroke.id);
+                    const sceneMesh = this.findMeshById ? this.findMeshById(hitStroke.id) : this.scene.children.find(m => m.userData && m.userData.strokeData && m.userData.strokeData.id === hitStroke.id);
                     if (sceneMesh) foundMesh = { object: sceneMesh };
                 }
             }
+        }
+
+        // 🚨 NİHAİ GRUP YAKALAMA: (Raycaster VEYA 2D yakalama sonrası) Eğer nesne bir grup içerisindeyse EN ÜST GRUBU (THREE.Group) bul!
+        if (foundMesh && foundMesh.object) {
+            let rootObj = foundMesh.object;
+            while (rootObj.parent && rootObj.parent !== this.scene && rootObj.parent.type === 'Group') {
+                rootObj = rootObj.parent;
+            }
+            foundMesh = { object: rootObj };
         }
 
         if (foundMesh) {
@@ -7687,6 +7686,9 @@ window.Scene3D = {
     },
 
     onMove: function (x, y) {
+        if (this.currentMesh && this.currentMesh.parent && this.currentMesh.parent !== this.scene && this.currentMesh.parent.type === 'Group') {
+            this.currentMesh = this.currentMesh.parent;
+        }
         if (this.isRotatingHandle && this.currentMesh) {
             this.currentMesh.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), (y - this.lastMousePos.y) * 0.01);
             this.currentMesh.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), (x - this.lastMousePos.x) * 0.01);
@@ -7703,21 +7705,7 @@ window.Scene3D = {
                         scale: this.currentMesh.scale.x
                     });
                 }
-                this.currentMesh.children.forEach(child => {
-                    if (child.userData && child.userData.strokeData) {
-                        const sd = child.userData.strokeData;
-                        const worldPos = new THREE.Vector3();
-                        const worldQuat = new THREE.Quaternion();
-                        const worldScale = new THREE.Vector3();
-                        child.matrixWorld.decompose(worldPos, worldQuat, worldScale);
-                        const euler = new THREE.Euler().setFromQuaternion(worldQuat);
-                        sd.rotationX = euler.x;
-                        sd.rotationY = euler.y;
-                        sd.rotationZ = euler.z;
-                        sd.pos3D = { x: worldPos.x, y: worldPos.y, z: worldPos.z };
-                        if (typeof window.sendNetworkData === 'function') window.sendNetworkData({ type: 'sekil_guncelle', stroke: sd });
-                    }
-                });
+                if (typeof window.redrawAllStrokes === 'function') window.redrawAllStrokes();
             } else if (this.currentMesh.userData && this.currentMesh.userData.strokeData) {
                 const sd = this.currentMesh.userData.strokeData;
                 sd.rotationX = this.currentMesh.rotation.x;
@@ -7743,13 +7731,6 @@ window.Scene3D = {
                         scale: this.currentMesh.scale.x
                     });
                 }
-                this.currentMesh.children.forEach(child => {
-                    if (child.userData && child.userData.strokeData) {
-                        const sd = child.userData.strokeData;
-                        sd.meshScale = (sd.meshScale || 1) * dragRatio;
-                        if (typeof window.sendNetworkData === 'function') window.sendNetworkData({ type: 'sekil_guncelle', stroke: sd });
-                    }
-                });
                 if (typeof window.redrawAllStrokes === 'function') window.redrawAllStrokes();
             } else if (this.currentMesh.userData && this.currentMesh.userData.strokeData) {
                 const sd = this.currentMesh.userData.strokeData;
@@ -7785,15 +7766,12 @@ window.Scene3D = {
                             scale: this.currentMesh.scale.x
                         });
                     }
-                    this.currentMesh.children.forEach(child => {
-                        if (child.userData && child.userData.strokeData) {
-                            const sd = child.userData.strokeData;
-                            const worldPos = new THREE.Vector3();
-                            child.getWorldPosition(worldPos);
-                            sd.pos3D = { x: worldPos.x, y: worldPos.y, z: worldPos.z };
-                            if (typeof window.sendNetworkData === 'function') window.sendNetworkData({ type: 'sekil_guncelle', stroke: sd });
-                        }
-                    });
+                } else if (this.currentMesh.userData && this.currentMesh.userData.strokeData) {
+                    const sd = this.currentMesh.userData.strokeData;
+                    const worldPos = new THREE.Vector3();
+                    this.currentMesh.getWorldPosition(worldPos);
+                    sd.pos3D = { x: worldPos.x, y: worldPos.y, z: worldPos.z };
+                    if (typeof window.sendNetworkData === 'function') window.sendNetworkData({ type: 'sekil_guncelle', stroke: sd });
                 }
             }
             return;
